@@ -84,6 +84,7 @@ pip-wheel-metadata
 # virtual envs
 numpy-dev/
 venv/
+.venv/
 
 # Paver generated files #
 #########################

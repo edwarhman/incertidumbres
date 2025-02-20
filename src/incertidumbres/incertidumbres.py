@@ -1,64 +1,66 @@
 import numpy as np
-from sympy import diff, Abs, N 
+from sympy import diff, Abs, N
 import math
 
-def evaluar_funcion(F, variables, valores):
-  subs_dict = {var: val for var, val in zip(variables, valores)}
-  return N(F.subs(subs_dict))
+class MedicionIndirecta:
+    """Clase para realizar cálculos de mediciones indirectas y propagación de errores."""
+    
+    @staticmethod
+    def evaluar_expresion(expresion, variables, valores):
+        """Evalúa una expresión simbólica con los valores dados."""
+        return N(expresion.subs(dict(zip(variables, valores))))
 
-def calc_error_absoluto(f, variables, X, dX):
-  derivadas_parciales = []
-  subs_dict = {var: val for var, val in zip(variables, X)}
+    @staticmethod
+    def calcular_error_absoluto(expresion, variables, valores, incertidumbres):
+        """Calcula el error absoluto usando el método de derivadas parciales."""
+        derivadas = [Abs(diff(expresion, var)) * dx 
+                    for var, dx in zip(variables, incertidumbres)]
+        
+        subs_dict = dict(zip(variables, valores))
+        return sum(N(deriv.subs(subs_dict)) for deriv in derivadas)
 
-  for i in range(len(variables)):
-    derivadas_parciales.append(Abs(diff(f, variables[i])) * dX[i])
+    @staticmethod
+    def calcular_desviacion_estandar(expresion, variables, valores, incertidumbres):
+        """Calcula la desviación estándar usando propagación de errores."""
+        derivadas = [Abs(diff(expresion, var)) * dx 
+                    for var, dx in zip(variables, incertidumbres)]
+        
+        subs_dict = dict(zip(variables, valores))
+        coefs = np.array([N(deriv.subs(subs_dict)) for deriv in derivadas])
+        suma = np.sum(coefs**2)
+        return suma ** (1/2)
 
-  coefs = list(map(lambda dp: N(dp.subs(subs_dict)), derivadas_parciales))
+    @classmethod
+    def calcular_medicion(cls, expresion, variables, datos):
+        """Calcula el valor y la incertidumbre de una medición indirecta."""
+        valores, incertidumbres = datos
+        valor = cls.evaluar_expresion(expresion, variables, valores)
+        incertidumbre = cls.calcular_desviacion_estandar(expresion, variables, valores, incertidumbres)
+        return np.array([valor, incertidumbre])
 
-  return sum(coefs)
+    @classmethod
+    def calcular_mediciones_lista(cls, expresion, variables, datos_lista):
+        """Calcula mediciones indirectas para una lista de datos."""
+        return np.array([cls.calcular_medicion(expresion, variables, datos) 
+                        for datos in datos_lista])
 
-def calc_desviacion_estandar(f, variables, X, dX):
-  derivadas_parciales = []
-  subs_dict = {var: val for var, val in zip(variables, X)}
-  for i in range(len(variables)):
-    derivadas_parciales.append(Abs(diff(f, variables[i])) * dX[i])
+class ProcesadorDatos:
+    """Clase para procesar y transformar datos de mediciones."""
+    
+    @staticmethod
+    def separar_valores_incertidumbres(datos):
+        """Separa una lista alternada de valores e incertidumbres."""
+        return np.array([datos[::2], datos[1::2]])
 
-  coefs = np.array(list(map(lambda dp: N(dp.subs(subs_dict)), derivadas_parciales)))
-  squart_coefs = coefs**2
-  suma = sum(squart_coefs)
-
-  return math.sqrt(suma)
-
-def calcular_medicion_indirecta(f, variables, datos):
-  return np.array([evaluar_funcion(f, variables, datos[0]), calc_desviacion_estandar(f, variables, datos[0], datos[1])])
-
-def evaluar_funcion_en_lista(F, variables, vector):
-  def evaluar_funcion_con_datos(datos):
-    return evaluar_funcion(F, variables, datos[0])
-  return np.array(list(map(evaluar_funcion_con_datos, vector)))
-
-def calcular_medicion_indirecta_en_lista(F, variables, vector):
-  def calcular_medicion_indirecta_con_datos(datos):
-    return calcular_medicion_indirecta(F, variables, datos)
-  return np.array(list(map(calcular_medicion_indirecta_con_datos, vector)))
-
-def separar_valores_incertidumbres(datos):
-  valores = datos[::2]
-  incertidumbres = datos[1::2]
-  return np.array([valores, incertidumbres])
-
-def separar_valores_incertidumbres_en_lista(vector):
-  return np.array(list(map(separar_valores_incertidumbres, vector)))
-
-def seleccionar_columnas_de_tabla(tabla, columnas):
-  return tabla[:, columnas]
-
-
-def agregar_calculo_a_dataframe(df, f, symbols, cols, nombreColumna):
-  variables = symbols
-  datos = df.to_numpy()
-  datosRelevantes = seleccionar_columnas_de_tabla(datos, cols)
-  datosRelevantesSeparados = separar_valores_incertidumbres_en_lista(datosRelevantes)
-  resultado = calcular_medicion_indirecta_en_lista(f, variables, datosRelevantesSeparados)
-  df[nombreColumna] = resultado[:,0]
-  df['Δ' + nombreColumna] = resultado[:,1]
+    @staticmethod
+    def procesar_dataframe(df, expresion, variables, columnas, nombre_resultado):
+        """Agrega columnas de resultado y su incertidumbre a un DataFrame."""
+        datos = df.to_numpy()[:, columnas]
+        datos_separados = np.array([ProcesadorDatos.separar_valores_incertidumbres(fila) 
+                                  for fila in datos])
+        
+        resultados = MedicionIndirecta.calcular_mediciones_lista(
+            expresion, variables, datos_separados)
+        
+        df[nombre_resultado] = resultados[:, 0]
+        df[f'Δ{nombre_resultado}'] = resultados[:, 1]

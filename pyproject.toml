@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "incertidumbres"
-version = "0.0.7"
+version = "0.0.9"
 authors = [
   { name="Emerson Warhman", email="edwarhman@gmail.com" },
 ]
 description = "Calcula incertidumbre de mediciones de laboratorio"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
