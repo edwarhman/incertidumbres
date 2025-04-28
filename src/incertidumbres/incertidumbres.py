@@ -1,6 +1,6 @@
 import numpy as np
 from sympy import diff, Abs, N
-import math
+import pandas as pd
 
 class MedicionIndirecta:
     """Clase para realizar cálculos de mediciones indirectas y propagación de errores."""
@@ -38,6 +38,19 @@ class MedicionIndirecta:
         incertidumbre = cls.calcular_desviacion_estandar(expresion, variables, valores, incertidumbres)
         return np.array([valor, incertidumbre])
 
+    @staticmethod
+    def calcular_desviacion_estandar_variaciones(expresion, variables, valores, incertidumbres):
+        """Calcula la desviación estándar usando propagación de errores."""
+        coeficientes = np.array([])
+        for val, dx in zip(valores, incertidumbres):
+            nuevos_valores = [x if x != val else x + dx for x in valores]
+            variacion = expresion.subs(dict(zip(variables, nuevos_valores))) - expresion.subs(dict(zip(variables, valores)))
+            coeficientes = np.append(coeficientes, N(variacion))
+        
+        suma = np.sum(coeficientes**2)
+        return suma ** (1/2)
+
+
     @classmethod
     def calcular_mediciones_lista(cls, expresion, variables, datos_lista):
         """Calcula mediciones indirectas para una lista de datos."""
@@ -64,3 +77,9 @@ class ProcesadorDatos:
         
         df[nombre_resultado] = resultados[:, 0]
         df[f'Δ{nombre_resultado}'] = resultados[:, 1]
+    
+    @staticmethod
+    def exportar_dataframe(df, nombre_archivo):
+        """Exporta los resultados de mediciones indirectas a un archivo."""
+        with pd.ExcelWriter(nombre_archivo) as writer:
+            df.to_excel(writer, sheet_name='Resultados')
